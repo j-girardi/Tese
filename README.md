@@ -1,2 +1,2 @@
 # Tese
-Código usado no concentrador de dados (Raspberry Pi) 
+concentratorFinal-Raspi.py is the file of the code developed for the concentrator (Raspberry Pi) used in the thesis.

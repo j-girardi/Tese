@@ -8,19 +8,14 @@ import threading
 
 
 def multicast_config():
-    """s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("192.168.137.1", 10010))
-    INTERFACE = (s.getsockname()[0])
-    s.close()"""
-    #s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    #INTERFACE = socket.inet_ntoa(fcntl.ioctl(s.fileno(),0x8915, struct.pack('256s', ifname[:15]))[20:24])
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    INTERFACE = socket.inet_ntoa(fcntl.ioctl(s.fileno(),0x8915, struct.pack('256s', ifname[:15]))[20:24]) # IP on the ethernet interface
     global sock
     ifname = 'eth0'
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     INTERFACE = socket.inet_ntoa(fcntl.ioctl(sock.fileno(), 0x8915, struct.pack('256s', bytes(ifname[:15], 'utf-8')))[20:24])
     GROUP_IP = "224.3.29.71"
     GROUP_PORT = 10000
-    #INTERFACE = '192.168.137.1'  # IP on the ethernet interface
     global multicast_group
     multicast_group = (GROUP_IP, GROUP_PORT)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -28,12 +23,8 @@ def multicast_config():
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, ip_pack)
     sock.settimeout(1)
     print(INTERFACE)
-    
-    bufsize = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
-    print(f'Buffer before: {bufsize}')
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4194304*4) #aumento do tamanho do buffer de recepcao
-    bufsize = sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4194304*4) #aumento do tamanho do buffer de recepcao
-    print(bufsize)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 16777216) #buffer size increase
+
     
 
 def mongo_config():
@@ -44,7 +35,7 @@ def mongo_config():
         "&retryWrites=true&w=majority")
     db = client.esp_data
     global posts
-    posts = db.teste_perdas
+    posts = db.data
 
 
 def data_split():
@@ -53,14 +44,7 @@ def data_split():
 
     if data != dic_backup[address[0]]:
         sensor1, sensor2, sensor3, sensor4, sensor5, sensor6, sensor7, sensor8, timestamp, count_id = data.decode().split('$$')
-        global old_count_id
-        if int(count_id) > (old_count_id+1):
-            global lostPackets
-            lostPackets += 1
-            print('Packet lost!')
-        old_count_id = int(count_id)
-       
-     
+
         post_1 = {
             'Timestamp': timestamp,
             'Module Address': address,
@@ -82,34 +66,22 @@ def data_split():
             posts.insert_many(dataList)
             t2 = time.time()
             dataList = []
-            x = t2-t1
-            if maxtime < x
-                maxtime = x
             print('Data posted! ..... time taken = {} s'.format(t2-t1))
-            print(f'Maximum time taken = {maxtime}')
-            file.write(' {} Data posted ... time taken = {} s\n'.format(c,x))
-            #print(f'{lostPackets} Packets lost...!')
         dic_backup[address] = data
 
 
-lostPackets = 0
+
 dataList = []
 dic_backup = {}
 multicast_config()
 mongo_config()
-dataBackup = '0'
 c = 0
-old_count_id = 0
-maxtime = 0
-
-file = open('2000datatime.txt', 'a')
-
 try:
 
     while True:
         # Send data
         message = str(time.time())
-        sent = sock.sendto(message.encode(), multicast_group)  # timestamp com resoluçao de milisegundos,
+        sent = sock.sendto(message.encode(), multicast_group)  # timestamp with millisecond resolution
         
         print('waiting to receive')
         while True:
@@ -124,11 +96,12 @@ try:
             else:
                 print('%d received "%s" from %s' % (c, data.decode(), address))
                 data_split()
-                #if c % 100000 == 0:
-                #    break
+                if c % 100000 == 0:
+                    break
 finally:
     print("closing socket")
     sock.close()
 
 
+                                        
                                         
